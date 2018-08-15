@@ -89,22 +89,23 @@ def process_parameters():
 
     return 0,''
 
-def log_init():
-    f = logfile
+def log_init(name):
+    d = os.path.dirname(logfile)
+    f = d+'/'+name+'.log'
     try:
         d = os.path.dirname(f)
         if not os.path.exists(d):
             os.makedirs(d)
         if not os.path.exists(f):
-            f = open(f, 'a')
-            f.truncate(0)
-            f.close()
+            fd = open(f, 'a')
+            fd.truncate(0)
+            fd.close()
     except Exception as err:
         return -1,err
 
     log_format = "[%(asctime)s] %(levelname)s [%(filename)s:%(lineno)d]: %(message)s"
     date_format = "%Y/%d/%m %H:%M:%S"
-    logging.basicConfig(filename=logfile, \
+    logging.basicConfig(filename=f, \
                        level = loglevel, \
                        format = log_format, \
                        datefmt=date_format)
@@ -123,6 +124,11 @@ def _start_csagent(volume, volinfo):
                                                            e.strerror))
             sys.exit(1)
 
+    status, val = log_init(volume)
+    if status:
+        sys.stderr.write("%s\n" % val)
+        sys.exit(status)
+    
     f = pidfile + volume + '.pid'
     try:
         d = os.path.dirname(f)
@@ -137,8 +143,8 @@ def _start_csagent(volume, volinfo):
 
     csagentd = Csagentd(pidfile=f, 
                     volinfo=volinfo, 
-                    stdout=logfile, 
-                    stderr=logfile,
+                    stdout=f, 
+                    stderr=f,
                     name=volume)
 
     if runmode == 'daemon':
@@ -156,7 +162,7 @@ def _stop_csagent(volume, volinfo):
                     volinfo=volinfo, 
                     stdout=logfile, 
                     stderr=logfile,
-                    name=progname)
+                    name=volume)
 
     csagentd.stop()
 
@@ -191,24 +197,16 @@ def main():
     # args
     status, val = process_parameters();
     if status:
-        print val
-        sys.exit(status)
-
-    status, val = log_init()
-    if status:
-        print val
+        sys.stdout.write(val)
         sys.exit(status)
 
     stats = GlusterStats()
     glfstatus = stats.get_stats()
-    #volinfos = stats.get_one_volume_infos('test1')
-    #print volinfos
 
     if(glfstatus['glusterd'] == 0):
-        sys.exit(-1)
+        sys.stdout.write("check glusterd status!\n")
     if(glfstatus['glusterfsd'] == 0):
-        print "check glusterfsd status!" 
-        sys.exit(-1)
+        sys.stdout.write("check glusterfsd status!\n")
 
     if glcmd == 'start':
         start_csagent(glfstatus)
