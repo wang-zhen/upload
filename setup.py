@@ -56,7 +56,7 @@ setup(
     data_files=[],
     entry_points={
         'console_scripts': [
-            'scanner_uploader_agentd = cloudsync.bin.scanner_uploader_agentd:main',
+            'scanner_uploader = bin.scanner_uploader:main',
         ],
     },
 )
