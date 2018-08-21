@@ -31,7 +31,7 @@ from cloudsync.csagentd.csagentd import *
 progname = 'scanner_uploader'
 #progname = __file__.split('.')[0]
 logfile = '/var/log/glusterfs/cloudsync/%s.log' % progname
-pidfile = '/var/run/cloudsync/%s' % progname
+pidfile = '/var/run/cloudsync/'
 loglevel = logging.INFO
 glcmd = ''
 runmode = 'daemon'
@@ -147,15 +147,34 @@ def _start_csagent(volume, volinfo):
                     stderr=f,
                     name=volume)
 
+    if not csagentd.status:
+        sys.stdout.write("Classe Csagentd init error!\n")
+        sys.exit(-1)
+
     if runmode == 'daemon':
         csagentd.start()
     else:
         csagentd.run()
  
-    return 0,csagentd
+    sys.exit(0)
 
    
 def _stop_csagent(volume, volinfo):
+    if (runmode == 'daemon'):
+        try:
+            pid = os.fork()
+            if pid > 0:
+                return 0
+        except OSError, e:
+            sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno,
+                                                           e.strerror))
+            sys.exit(1)
+
+    status, val = log_init(volume)
+    if status:
+        sys.stderr.write("%s\n" % val)
+        sys.exit(status)
+
     f = pidfile + volume + '.pid'
 
     csagentd = Csagentd(pidfile=f, 
@@ -164,9 +183,13 @@ def _stop_csagent(volume, volinfo):
                     stderr=logfile,
                     name=volume)
 
+    if not csagentd.status:
+        sys.stdout.write("Classe Csagentd init error!\n")
+        sys.exit(-1)
+
     csagentd.stop()
 
-    return 0,''
+    sys.exit(0)
 
 
 def start_csagent(glfstatus):
@@ -174,6 +197,8 @@ def start_csagent(glfstatus):
     volinfos = glfstatus['volume_infos']
 
     for vol in glfstatus['volumes']:
+        #if vol in ('vol1','vol2'):
+        #    continue
         _start_csagent(vol, volinfos[vol])
         time.sleep(0.1)
 

@@ -28,8 +28,9 @@ class Csagentd(Daemon):
     def __init__(self, volinfo, pidfile, stdout, stderr, name):
         self.volinfo = volinfo
         self.logger = logging.getLogger(__name__)
-        self.gluster_point = '/cloudsync/gluster/%s' % name
-        self.nas_point = '/cloudsync/nas/%s' % name
+        self.gluster_mountpoint = '/cloudsync/gluster/%s' % name
+        self.nas_mountpoint = '/cloudsync/nas/%s' % name
+        self.status = True
 
         try:
             if not os.path.exists(self.gluster_mountpoint):
@@ -37,7 +38,9 @@ class Csagentd(Daemon):
             if not os.path.exists(self.nas_mountpoint):
                 os.makedirs(self.nas_mountpoint)
         except Exception as err:
-            return -1,err
+            self.logger.error(err)
+            self.status = False
+            return None
 
         super(Csagentd, self).__init__(
             pidfile = pidfile, stdout=stdout, stderr=stderr, name=name)
@@ -95,7 +98,7 @@ class Csagentd(Daemon):
             self.logger.debug("%s has been mounted",self.nas_mountpoint)
             return status
 
-        cmd = "mount  %s:/%s" % (self.nashostname, self.nasshare)
+        cmd = "mount  %s:/%s %s" % (self.nashostname, self.nasshare, self.nas_mountpoint)
         self.logger.info(cmd)
         status,message = commands.getstatusoutput(cmd)
         if status:
@@ -153,7 +156,8 @@ class Csagentd(Daemon):
         return True
 
     def run(self):
-        self.logger.info("pidid:%s is running...",os.getpid())
+        self.logger.info("volume(%s) pid(%s) is running...",self.name,os.getpid())
+        self.logger.debug(self.volinfo)
 
         while True:
             if not self.volinfo:
@@ -172,22 +176,20 @@ class Csagentd(Daemon):
 
             self.mount_gluster_vol()
 
-            '''
             status = self.active_watermark_thread()
             if not status:
                 self.logger.warning("active status is false")
                 time.sleep(f)
                 self.update_volinfo()
                 continue
-            '''
             
-            if self.volinfo['cloudsync'] != 'cloudsyncnas':
+            if self.volinfo['cs-storetype'] == 'cloudsyncnas':
                 self.logger.debug("cs-storetype : cloudsyncnas")
-                self.nasshare = volinfo['nasplugin-share'].strip('/')
-                self.nashostname = volinfo['nasplugin-hostname']
+                self.nasshare = self.volinfo['nasplugin-share'].strip('/')
+                self.nashostname = self.volinfo['nasplugin-hostname']
                 self.mount_nas_vol()
                 self.nas_upload_files()
-            elif self.volinfo['cloudsync'] != 'cloudsyncs3':
+            elif self.volinfo['cs-storetype'] == 'cloudsyncs3':
                 self.logger.debug("cs-storetype : cloudsyncs3")
                 self.s3_upload_files()
             else:

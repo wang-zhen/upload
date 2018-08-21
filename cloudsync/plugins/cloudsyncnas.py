@@ -57,6 +57,7 @@ def _upload_file(dest, src):
         return -1,'null'
 
     d = os.path.dirname(dest)
+    logger.debug("dest:%s src:%s",dest,src)
     try:
         if not os.path.exists(d):
             os.makedirs(d)
@@ -68,6 +69,7 @@ def _upload_file(dest, src):
     except Exception as err:
         return -1,err
 
+    return 0,''
 
 def _nas_upload(filelist, volinfo, volume):
     """
@@ -95,19 +97,15 @@ def _nas_upload(filelist, volinfo, volume):
     upfileinfo['success'] = 0 
     upfileinfo['failed'] = 0 
 
-    status,msg = nas_mount(volinfo)
-    if status:
-        logger.error(msg)
-        return status, upfileinfo
-
     filenu = 0 
+    nasmountpoint = "/cloudsync/nas/%s" % volume
     for src in filelist:
         filenu = filenu + 1 
         try:
             mp = "/cloudsync/gluster/%s" % volume.strip()
             dest = src.split(mp)[1]
             cms = format(time.time(), '.6f')
-            dest = dest + "_" + cms 
+            dest = nasmountpoint + dest + "_" + cms 
 
             logger.debug("%s:%s:%s",volinfo['nasplugin-share'],dest,src)
 
@@ -124,7 +122,7 @@ def _nas_upload(filelist, volinfo, volume):
                 logger.error("%s:%s", src, msg)
                 continue
 
-            stat,msg =  _upload_file(dest.lstrip('/'), src)
+            stat,msg =  _upload_file(dest, src)
             if stat:
                 logger.error(msg)
 
@@ -205,7 +203,7 @@ def _sqlite3_update(upinfo):
 def _fileter(files, volume):
     localfiles = []
     for f in files:
-        path = "/upload/%s/%s" % (volume, f.strip().strip('/'))
+        path = "/cloudsync/gluster/%s/%s" % (volume, f.strip().strip('/'))
 
         status,val = _getxattr(path, 'trusted.glusterfs.cs.remote')
         if not status:

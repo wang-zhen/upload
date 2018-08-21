@@ -94,12 +94,33 @@ def _s3upload(filelist, volinfo, volume):
 
     return 0, upfileinfo
 
+def _upload_file(dest, src):
+    if (not dest) or (not src):
+        return -1,'null'
+
+    d = os.path.dirname(dest)
+    try:
+        if not os.path.exists(d):
+            os.makedirs(d)
+    except Exception as err:
+        print err
+        return -1,err
+
+    try:
+        shutil.copyfile(src, dest)
+    except Exception as err:
+        print err
+        return -1,err
+
 if __name__ == "__main__":
-   filelist = ['/upload/test1/glusterfs/xlators/features/selinux/src/selinux.h']
+    filelist = ['/upload/test1/glusterfs/xlators/features/selinux/src/selinux.h']
 
-   volinfo = {'s3plugin-https': 'off', 's3plugin-bucketid': 'test1', 'cs-storetype': 'cloudsyncs3', 's3plugin-keyid': 'SIWSWX33WD7K8HADNYVU', 'cs-worm': 'on', 's3plugin-hostname': '192.168.2.95:9000', 'cloudsync': 'on', 's3plugin-seckey': 'u1fIgYyWlyNjJC3XjM8gH+i908EQk/OBkb9Cxjmk', 'cs-watermark-thread-frequency': '3', 'cs-max-files': '1000', 'cs-max-mb': '4000'}
+    volinfo = {'s3plugin-https': 'off', 's3plugin-bucketid': 'test1', 'cs-storetype': 'cloudsyncs3', 's3plugin-keyid': 'SIWSWX33WD7K8HADNYVU', 'cs-worm': 'on', 's3plugin-hostname': '192.168.2.95:9000', 'cloudsync': 'on', 's3plugin-seckey': 'u1fIgYyWlyNjJC3XjM8gH+i908EQk/OBkb9Cxjmk', 'cs-watermark-thread-frequency': '3', 'cs-max-files': '1000', 'cs-max-mb': '4000'}
 
-   volume = 'test1'
+    volume = 'test1'
 
-   _s3upload(filelist, volinfo, volume)
- 
+    #_s3upload(filelist, volinfo, volume)
+    
+    dest = '/cloudsync/nas/vol3/file_1534843111.260598'
+    src = '/cloudsync/gluster/vol3/file'
+    _upload_file(dest, src)     
