@@ -15,7 +15,8 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from daemon.daemon import *
 from glusters.glfstats import *
-from utils.cloudsync_upload import cloudsync_upload
+from plugins.cloudsyncs3 import s3_upload
+from plugins.cloudsyncnas import nas_upload
 
 progname = __file__.split('.')[0]
 default_logfile = '/var/log/glusterfs/cloudsync/%s.log' % progname
@@ -27,11 +28,14 @@ class Csagentd(Daemon):
     def __init__(self, volinfo, pidfile, stdout, stderr, name):
         self.volinfo = volinfo
         self.logger = logging.getLogger(__name__)
-        self.mount_point = '/upload/%s' % name
+        self.gluster_point = '/cloudsync/gluster/%s' % name
+        self.nas_point = '/cloudsync/nas/%s' % name
 
         try:
-            if not os.path.exists(self.mount_point):
-                os.makedirs(self.mount_point)
+            if not os.path.exists(self.gluster_mountpoint):
+                os.makedirs(self.gluster_mountpoint)
+            if not os.path.exists(self.nas_mountpoint):
+                os.makedirs(self.nas_mountpoint)
         except Exception as err:
             return -1,err
 
@@ -43,7 +47,7 @@ class Csagentd(Daemon):
         self.volinfo = stats.get_one_volume_infos(self.name)
 
     def active_watermark_thread(self):
-        path = self.mount_point
+        path = self.gluster_mountpoint
 
         xattr.setxattr(path, 'trusted.glusterfs.cs.active_watermark_thread', '9')
 
@@ -67,12 +71,37 @@ class Csagentd(Daemon):
 
         return False
 
-    def mount_local_vol(self):
-        cmd = "mount.glusterfs  127.0.0.1:/%s %s" % (self.name, self.mount_point)
-        self.logger.info(cmd)
+    def mount_gluster_vol(self):
+        cmd = "mount |grep %s" % self.gluster_mountpoint
         status,message = commands.getstatusoutput(cmd)
         if not status:
-            self.logger.error("mount.glusterfs err")
+            self.logger.debug("%s has been mounted",self.gluster_mountpoint)
+            return status
+
+        cmd = "mount.glusterfs  127.0.0.1:/%s %s" % (self.name, self.gluster_mountpoint)
+        self.logger.info(cmd)
+        status,message = commands.getstatusoutput(cmd)
+        if status:
+            self.logger.info("%s  failed", cmd)
+
+        self.logger.info("%s  successfully", cmd)
+        
+        return status
+
+    def mount_nas_vol(self):
+        cmd = "mount |grep %s" % self.nas_mountpoint
+        status,message = commands.getstatusoutput(cmd)
+        if not status:
+            self.logger.debug("%s has been mounted",self.nas_mountpoint)
+            return status
+
+        cmd = "mount  %s:/%s" % (self.nashostname, self.nasshare)
+        self.logger.info(cmd)
+        status,message = commands.getstatusoutput(cmd)
+        if status:
+            self.logger.info("%s  failed", cmd)
+
+        self.logger.info("%s  successfully", cmd)
         
         return status
 
@@ -99,7 +128,7 @@ class Csagentd(Daemon):
         
         return file_context
           
-    def upload_allfiles(self):
+    def nas_upload_files(self):
         files = self._get_allfiles()
         if not files:
             return False
@@ -108,8 +137,20 @@ class Csagentd(Daemon):
         #    files[i] = files[i].strip('\n')
 
         #print files
-        cloudsync_upload(files, self.volinfo, self.name)
-        return 0
+        nas_upload(files, self.volinfo, self.name)
+        return True
+
+    def s3_upload_files(self):
+        files = self._get_allfiles()
+        if not files:
+            return False
+       
+        #for i in range(len(files)):
+        #    files[i] = files[i].strip('\n')
+
+        #print files
+        s3_upload(files, self.volinfo, self.name)
+        return True
 
     def run(self):
         self.logger.info("pidid:%s is running...",os.getpid())
@@ -129,16 +170,31 @@ class Csagentd(Daemon):
                 self.update_volinfo()
                 continue
 
-            self.mount_local_vol()
+            self.mount_gluster_vol()
 
+            '''
             status = self.active_watermark_thread()
             if not status:
                 self.logger.warning("active status is false")
                 time.sleep(f)
                 self.update_volinfo()
                 continue
+            '''
             
-            self.upload_allfiles()
+            if self.volinfo['cloudsync'] != 'cloudsyncnas':
+                self.logger.debug("cs-storetype : cloudsyncnas")
+                self.nasshare = volinfo['nasplugin-share'].strip('/')
+                self.nashostname = volinfo['nasplugin-hostname']
+                self.mount_nas_vol()
+                self.nas_upload_files()
+            elif self.volinfo['cloudsync'] != 'cloudsyncs3':
+                self.logger.debug("cs-storetype : cloudsyncs3")
+                self.s3_upload_files()
+            else:
+                self.logger.error("cs-storetype : null")
+                time.sleep(f)
+                continue
+
             self.update_volinfo()
 
             time.sleep(f)

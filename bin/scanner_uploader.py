@@ -24,9 +24,9 @@ from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from daemon.daemon import *
-from glusters.glfstats import *
-from csagentd.csagentd import *
+from cloudsync.daemon.daemon import *
+from cloudsync.glusters.glfstats import *
+from cloudsync.csagentd.csagentd import *
 
 progname = 'scanner_uploader'
 #progname = __file__.split('.')[0]
