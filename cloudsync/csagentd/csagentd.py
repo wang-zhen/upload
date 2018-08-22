@@ -155,6 +155,24 @@ class Csagentd(Daemon):
         s3_upload(files, self.volinfo, self.name)
         return True
 
+    def stop(self):
+        cmd = "umount %s" % self.nas_mountpoint
+        status,message = commands.getstatusoutput(cmd)
+        if status:
+            self.logger.info(message)
+        else:
+            self.logger.info("%s  successfully", cmd)
+
+        cmd = "umount %s" % self.gluster_mountpoint
+        status,message = commands.getstatusoutput(cmd)
+        if status:
+            self.logger.info(message)
+        else:
+            self.logger.info("%s  successfully", cmd)
+
+        self.logger.info("volume(%s) pid(%s) is about to stop",self.name, self.getpid())
+        super(Csagentd, self).stop()
+
     def run(self):
         self.logger.info("volume(%s) pid(%s) is running...",self.name,os.getpid())
         self.logger.debug(self.volinfo)
