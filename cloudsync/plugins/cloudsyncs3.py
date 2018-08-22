@@ -118,10 +118,10 @@ def _s3_upload(filelist, volinfo, volume):
     upfileinfo['failed'] = 0
 
     filenu = 0
+    mp = "/cloudsync/gluster/%s" % volume.strip()
     for src in filelist:
         filenu = filenu + 1
         try:
-            mp = "/upload/%s" % volume.strip()
             dest = src.split(mp)[1]
             cms = format(time.time(), '.6f')
             dest = dest + "_" + cms
@@ -148,7 +148,7 @@ def _s3_upload(filelist, volinfo, volume):
             if not stat:
                 logger.error("%s:%s", src, msg)
 
-            stat,msg =  _setxattr(src, 'trusted.glusterfs.csou.complete', dest)
+            stat,msg =  _setxattr(src, 'trusted.glusterfs.csou.complete', dest.lstrip('/'))
             if not stat:
                 logger.error("%s:%s", src, msg)
 
@@ -228,7 +228,7 @@ def _sqlite3_update(upinfo):
 def _fileter(files, volume):
     localfiles = []
     for f in files:
-        path = "/upload/%s/%s" % (volume, f.strip().strip('/'))
+        path = "/cloudsync/gluster/%s/%s" % (volume, f.strip().strip('/'))
 
         status,val = _getxattr(path, 'trusted.glusterfs.cs.remote')
         if not status:

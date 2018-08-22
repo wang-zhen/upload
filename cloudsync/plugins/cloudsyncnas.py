@@ -105,7 +105,8 @@ def _nas_upload(filelist, volinfo, volume):
             mp = "/cloudsync/gluster/%s" % volume.strip()
             dest = src.split(mp)[1]
             cms = format(time.time(), '.6f')
-            dest = nasmountpoint + dest + "_" + cms 
+            fxattr = dest + "_" + cms
+            dest = nasmountpoint + fxattr
 
             logger.debug("%s:%s:%s",volinfo['nasplugin-share'],dest,src)
 
@@ -131,7 +132,7 @@ def _nas_upload(filelist, volinfo, volume):
             if not stat:
                 logger.error("%s:%s", src, msg)
 
-            stat,msg =  _setxattr(src, 'trusted.glusterfs.csou.complete', dest)
+            stat,msg =  _setxattr(src, 'trusted.glusterfs.csou.complete', fxattr.lstrip('/'))
             if not stat:
                 logger.error("%s:%s", src, msg)
 
