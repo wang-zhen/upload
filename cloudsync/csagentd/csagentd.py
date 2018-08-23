@@ -128,7 +128,8 @@ class Csagentd(Daemon):
 
             path = filedir + filename
             file_context = file_context + open(path.strip()).readlines() 
-        
+            os.remove(path)
+ 
         return file_context
           
     def nas_upload_files(self):

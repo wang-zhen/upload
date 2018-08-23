@@ -8,20 +8,24 @@ import time
 import xattr
 import threading
 
-
-def fun_timer():
-    print('hello timer')
-    global timer
-    timer = threading.Timer(2,fun_timer)
-
-    timer.start()
-
 def test():
-    timer = threading.Timer(2,fun_timer)
-    timer.start()
-    while(True):
-        print('test')
-        time.sleep(2)
+    filedir = '/var/run/gluster/vol3-cloudsync/'
+    try:
+        filenames = os.listdir(filedir)
+    except Exception as err:
+        return []
+
+    file_context = []
+    for filename in filenames:
+        fname, ftype = os.path.splitext(filename)
+        if (ftype != '.qf'):
+            continue
+
+        path = filedir + filename
+        file_context = file_context + open(path.strip()).readlines() 
+        os.remove(path) 
+          
+    return file_context
 
 if __name__ == "__main__":
-    test()
+    print test()
