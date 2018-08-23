@@ -84,20 +84,25 @@ class GlusterStats(object):
 
         return infos
 
-    def get_one_volume_infos(self, vol):
+    def get_one_volume_infos(self, volume):
         """ 
             Get one gluster volume infos from /var/lib/glusterd/vols/
         """
         volpath = "cat /var/lib/glusterd/vols/%s/%s.tcp-fuse.vol"
         infos = {}
-        for volume in self.volumes:
-            if(volume == vol):
-                cmd = volpath % (volume,volume)
-                all_entries = self._execute(cmd)
-                info = self._parse_brick_entries(volume, all_entries['stdout'])
 
-                for k,v in info.items():
-                    infos = v.copy()
+        cmd = volpath % (volume,volume)
+        all_entries = self._execute(cmd)
+        info = self._parse_brick_entries(volume, all_entries['stdout'])
+
+        for k,v in info.items():
+            infos = v.copy()
+
+        cmd = "gluster vol status %s" % (volume)
+        if self._execute(cmd)['return_code']:
+            infos['status'] = 'stop'
+        else:
+            infos['status'] = 'start'
 
         return infos
 
@@ -105,17 +110,9 @@ class GlusterStats(object):
         """ 
             Get all gluster volume infos from /var/lib/glusterd/vols/
         """
-        volpath = "cat /var/lib/glusterd/vols/%s/%s.tcp-fuse.vol"
         infos = {}
         for volume in self.volumes:
-            cmd = volpath % (volume,volume)
-            all_entries = self._execute(cmd)
-            info = self._parse_brick_entries(volume, all_entries['stdout'])
-
-            for k,v in info.items():
-                stat = v.copy()
-
-            infos[volume] = stat
+            infos[volume] = self.get_one_volume_infos(volume)
 
         return infos
 
@@ -159,15 +156,15 @@ class GlusterStats(object):
 
         if p.returncode > 0:
             error = "ERROR: command '%s' failed with:\n%s%s" % (cmd, stdout, stderr)
-            sys.stderr.write(error)
-            sys.exit(p.returncode)
+            #sys.stderr.write(error)
+            #sys.exit(p.returncode)
         response = {'command': cmd,
                     'stdout': stdout,
                     'stderr': stderr,
                     'timeout_happened': timeout_happened['value'],
                     'return_code': p.returncode,
                    }
-
+                   
         if self.record_mode:
             if 'heal' in cmd:
                 response['stdout'] = self._strip_filenames_from_response(stdout)
@@ -180,6 +177,8 @@ def main():
     
     #stats.get_volume_infos()
     print (stats.get_stats())
+    #print (stats.get_one_volume_infos('test1'))
+    #print (stats.get_volume_infos())
 
 if __name__ == '__main__':
     main()

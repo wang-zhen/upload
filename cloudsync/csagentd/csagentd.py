@@ -74,7 +74,7 @@ class Csagentd(Daemon):
 
         return False
 
-    def mount_gluster_vol(self):
+    def ms_upload_filesount_gluster_vol(self):
         cmd = "mount |grep %s" % self.gluster_mountpoint
         status,message = commands.getstatusoutput(cmd)
         if not status:
@@ -177,18 +177,37 @@ class Csagentd(Daemon):
         self.logger.info("volume(%s) pid(%s) is running...",self.name,os.getpid())
         self.logger.debug(self.volinfo)
 
+        f1 = default_frequency
+        f2 = default_frequency
+        f3 = default_frequency
+
         while True:
-            if not self.volinfo:
-                time.sleep(default_frequency)
-                self.logger.warning("please check %s 'cloudsync' status!",self.name)
+            if (not self.volinfo):
+                time.sleep(f1)
+                self.logger.warning("volume %s infos in %s is null!",self.name)
+                self.update_volinfo()
                 continue
 
-            f = (int)(self.volinfo['cs-watermark-thread-frequency'])
-            self.logger.info("cs-watermark-thread-frequency:%d",f)
+            if (self.volinfo.has_key('cs-watermark-thread-frequency')):
+                f1 = (int)(self.volinfo['cs-watermark-thread-frequency'])
+
+            self.logger.info("cs-watermark-thread-frequency:%d",f1)
+
+            if self.volinfo['status'] == 'stop':
+                self.logger.warning("Volume %s is not started!",self.name)
+                time.sleep(f1)
+                self.update_volinfo()
+                continue
+
+            if not self.volinfo.has_key('cloudsync'):
+                self.logger.warning("Volume:%s  cloudsync feature is not supported!",self.name)
+                time.sleep(f1)
+                self.update_volinfo()
+                continue
 
             if self.volinfo['cloudsync'] != 'on':
-                self.logger.warning("please check %s 'cloudsync' status!",self.name)
-                time.sleep(f)
+                self.logger.warning("Volume:%s  cloudsync feature is off!",self.name)
+                time.sleep(f1)
                 self.update_volinfo()
                 continue
 
@@ -196,8 +215,8 @@ class Csagentd(Daemon):
 
             status = self.active_watermark_thread()
             if not status:
-                self.logger.warning("active status is false")
-                time.sleep(f)
+                self.logger.warning("active watermark failed")
+                time.sleep(f1)
                 self.update_volinfo()
                 continue
             
@@ -212,12 +231,12 @@ class Csagentd(Daemon):
                 self.s3_upload_files()
             else:
                 self.logger.error("cs-storetype : null")
-                time.sleep(f)
+                time.sleep(f1)
                 continue
 
             self.update_volinfo()
 
-            time.sleep(f)
+            time.sleep(f1)
 
 def main():
     agentd = Csagentd(pidfile=default_pidfile, 

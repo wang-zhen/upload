@@ -55,9 +55,13 @@ class Daemon(object):
         self.pidfile = pidfile
         self.name = name
 
-        #piddir = os.path.dirname(self.pidfile)
-        #if not os.path.exists(piddir):
-        #    os.makedirs(piddir)
+        piddir = os.path.dirname(self.pidfile)
+        if not os.path.exists(piddir):
+            os.makedirs(piddir)
+        if not os.path.exists(self.pidfile):
+            h = open(self.pidfile, 'a')
+            h.truncate(0)
+            h.close()
 
     def daemonize(self):
         try:

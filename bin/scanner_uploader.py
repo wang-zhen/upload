@@ -4,7 +4,7 @@
 """
 Written by: WangZhen linux_wz@163.com
 Written on: 18 Jul 2018
-Description: Upload .
+Description: Cloudsync scanner/uploader tools
 """
 
 import os
@@ -31,7 +31,7 @@ from cloudsync.csagentd.csagentd import *
 progname = 'scanner_uploader'
 #progname = __file__.split('.')[0]
 logfile = '/var/log/glusterfs/cloudsync/%s.log' % progname
-pidfile = '/var/run/cloudsync/'
+pidfile = '/var/run/cloudsync/%s.pid' % progname
 loglevel = logging.INFO
 glcmd = ''
 runmode = 'daemon'
@@ -110,7 +110,7 @@ def log_init(name):
                        format = log_format, \
                        datefmt=date_format)
 
-    return 0,''
+    return 0,f
 
 def _start_csagent(volume, volinfo):
  
@@ -124,27 +124,18 @@ def _start_csagent(volume, volinfo):
                                                            e.strerror))
             sys.exit(1)
 
-    status, val = log_init(volume)
+    status, lpath = log_init(volume)
     if status:
         sys.stderr.write("%s\n" % val)
         sys.exit(status)
     
-    f = pidfile + volume + '.pid'
-    try:
-        d = os.path.dirname(f)
-        if not os.path.exists(d):
-            os.makedirs(d)
-        if not os.path.exists(f):
-            h = open(f, 'a')
-            h.truncate(0)
-            h.close()
-    except Exception as err:
-        return -1,err
+    d = os.path.dirname(pidfile)
+    f = d+'/'+volume+'.pid'
 
     csagentd = Csagentd(pidfile=f, 
                     volinfo=volinfo, 
-                    stdout=f, 
-                    stderr=f,
+                    stdout=lpath, 
+                    stderr=lpath,
                     name=volume)
 
     if not csagentd.status:
@@ -153,10 +144,11 @@ def _start_csagent(volume, volinfo):
 
     if runmode == 'daemon':
         csagentd.start()
+        sys.exit(0)
     else:
         csagentd.run()
  
-    sys.exit(0)
+    return 0
 
    
 def _stop_csagent(volume, volinfo):
@@ -170,17 +162,18 @@ def _stop_csagent(volume, volinfo):
                                                            e.strerror))
             sys.exit(1)
 
-    status, val = log_init(volume)
+    status, lpath = log_init(volume)
     if status:
         sys.stderr.write("%s\n" % val)
         sys.exit(status)
 
-    f = pidfile + volume + '.pid'
+    d = os.path.dirname(pidfile)
+    f = d+'/'+volume+'.pid'
 
     csagentd = Csagentd(pidfile=f, 
                     volinfo=volinfo, 
-                    stdout=logfile, 
-                    stderr=logfile,
+                    stdout=lpath, 
+                    stderr=lpath,
                     name=volume)
 
     if not csagentd.status:
@@ -197,10 +190,8 @@ def start_csagent(glfstatus):
     volinfos = glfstatus['volume_infos']
 
     for vol in glfstatus['volumes']:
-        #if vol in ('vol1','vol2'):
-        #    continue
         _start_csagent(vol, volinfos[vol])
-        time.sleep(0.1)
+        time.sleep(0.5)
 
 
 def stop_csagent(glfstatus):
@@ -209,12 +200,11 @@ def stop_csagent(glfstatus):
 
     for vol in glfstatus['volumes']:
         _stop_csagent(vol, volinfos[vol])
-        time.sleep(0.1)
+        time.sleep(0.5)
 
 
 def restart_csagent(glfstatus):
     stop_csagent(glfstatus)
-    time.sleep(1)
     start_csagent(glfstatus)
 
 
@@ -232,6 +222,10 @@ def main():
         sys.stdout.write("check glusterd status!\n")
     if(glfstatus['glusterfsd'] == 0):
         sys.stdout.write("check glusterfsd status!\n")
+
+    for vol,infos in glfstatus['volume_infos'].items():
+        if(infos['status'] == 'stop'):
+            sys.stdout.write("check volume:%s status!\n" % vol)
 
     if glcmd == 'start':
         start_csagent(glfstatus)
