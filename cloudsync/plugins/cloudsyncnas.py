@@ -123,14 +123,17 @@ def _nas_upload(filelist, volinfo, volume):
                 logger.error("%s:%s", src, msg)
                 continue
 
-            stat,msg =  _upload_file(dest, src)
-            if stat:
-                logger.error(msg)
+            stat1,msg1 =  _upload_file(dest, src)
 
             #upload end,unlock file
             stat,msg =  _unlockfile(src)
             if not stat:
                 logger.error("%s:%s", src, msg)
+
+            if stat1:
+                upfileinfo['failed'] = upfileinfo['failed'] + 1
+                logger.error(msg1)
+                continue
 
             stat,msg =  _setxattr(src, 'trusted.glusterfs.csou.complete', fxattr.lstrip('/'))
             if not stat:

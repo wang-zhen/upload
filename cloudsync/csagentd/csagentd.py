@@ -50,6 +50,9 @@ class Csagentd(Daemon):
         self.volinfo = stats.get_one_volume_infos(self.name)
 
     def active_watermark_thread(self):
+
+        self.logger.debug("active_watermark_thread")
+
         path = self.gluster_mountpoint
 
         xattr.setxattr(path, 'trusted.glusterfs.cs.active_watermark_thread', '9')
@@ -86,8 +89,8 @@ class Csagentd(Daemon):
         status,message = commands.getstatusoutput(cmd)
         if status:
             self.logger.info("%s  failed", cmd)
-
-        self.logger.info("%s  successfully", cmd)
+        else:
+            self.logger.info("%s  successfully", cmd)
         
         return status
 
@@ -98,13 +101,26 @@ class Csagentd(Daemon):
             self.logger.debug("%s has been mounted",self.nas_mountpoint)
             return status
 
-        cmd = "mount  %s:/%s %s" % (self.nashostname, self.nasshare, self.nas_mountpoint)
+        if self.nastype == 'cifs':
+            if self.nasuser and self.naspasswd:
+                cmd = "mount -t cifs -o username='%s',password='%s' //%s/%s %s" % \
+                      (self.nasuser, self.naspasswd, self.nashostname, \
+                       self.nasshare, self.nas_mountpoint)
+            else:
+                cmd = "mount -t cifs //%s/%s %s" % \
+                      (self.nashostname, self.nasshare, self.nas_mountpoint)
+
+        if self.nastype == 'nfs':
+            cmd = "mount  %s:/%s %s" % \
+                  (self.nashostname, self.nasshare, self.nas_mountpoint)
+
         self.logger.info(cmd)
+
         status,message = commands.getstatusoutput(cmd)
         if status:
-            self.logger.info("%s  failed", cmd)
-
-        self.logger.info("%s  successfully", cmd)
+            self.logger.error(message)
+        else:
+            self.logger.info("%s  successfully", cmd)
         
         return status
 
@@ -135,6 +151,7 @@ class Csagentd(Daemon):
     def nas_upload_files(self):
         files = self._get_allfiles()
         if not files:
+            self.logger.debug("scanner: files in null")
             return False
        
         #for i in range(len(files)):
@@ -178,66 +195,74 @@ class Csagentd(Daemon):
         self.logger.info("volume(%s) pid(%s) is running...",self.name,os.getpid())
         self.logger.debug(self.volinfo)
 
-        f1 = default_frequency
+        f1 = 1
         f2 = default_frequency
         f3 = default_frequency
 
         while True:
+            time.sleep(f1)
+            self.update_volinfo()
+
             if (not self.volinfo):
-                time.sleep(f1)
                 self.logger.warning("volume %s infos in %s is null!",self.name)
-                self.update_volinfo()
                 continue
 
             if (self.volinfo.has_key('cs-watermark-thread-frequency')):
                 f1 = (int)(self.volinfo['cs-watermark-thread-frequency'])
+            else:
+                f1 = default_frequency
 
             self.logger.info("cs-watermark-thread-frequency:%d",f1)
 
             if self.volinfo['status'] == 'stop':
                 self.logger.warning("Volume %s is not started!",self.name)
-                time.sleep(f1)
-                self.update_volinfo()
                 continue
 
             if not self.volinfo.has_key('cloudsync'):
                 self.logger.warning("Volume:%s  cloudsync feature is not supported!",self.name)
-                time.sleep(f1)
-                self.update_volinfo()
                 continue
 
             if self.volinfo['cloudsync'] != 'on':
                 self.logger.warning("Volume:%s  cloudsync feature is off!",self.name)
-                time.sleep(f1)
-                self.update_volinfo()
                 continue
 
-            self.mount_gluster_vol()
+            if self.mount_gluster_vol():
+                self.logger.error("mount_gluster_vol failed")
+                continue
 
             status = self.active_watermark_thread()
             if not status:
-                self.logger.warning("active watermark failed")
-                time.sleep(f1)
-                self.update_volinfo()
+                self.logger.error("active watermark failed")
                 continue
             
             if self.volinfo['cs-storetype'] == 'cloudsyncnas':
-                self.logger.debug("cs-storetype : cloudsyncnas")
+                self.logger.debug("cs-storetype : cloudsyncnas, nastype : cifs")
                 self.nasshare = self.volinfo['nasplugin-share'].strip('/')
-                self.nashostname = self.volinfo['nasplugin-hostname']
-                self.mount_nas_vol()
-                self.nas_upload_files()
+                self.nashostname = self.volinfo['nasplugin-hostname'].strip('/')
+                self.nastype = 'cifs' 
+
+                self.nasuser = ''
+                self.naspasswd = ''
+                if (self.volinfo.has_key('nasplugin-user')):
+                    self.nasuser = self.volinfo['nasplugin-user']
+                if (self.volinfo.has_key('nasplugin-user')):
+                    self.naspasswd = self.volinfo['nasplugin-passwd']
+
+                if self.mount_nas_vol():
+                    self.logger.error("mount_nas_vol failed")
+                    continue
+
+                if self.nas_upload_files():
+                    self.logger.error("nas_upload_files failed")
+                    continue
             elif self.volinfo['cs-storetype'] == 'cloudsyncs3':
                 self.logger.debug("cs-storetype : cloudsyncs3")
-                self.s3_upload_files()
+                if self.s3_upload_files():
+                    self.logger.error("s3_upload_files failed")
+                    continue
             else:
                 self.logger.error("cs-storetype : null")
-                time.sleep(f1)
-                continue
 
-            self.update_volinfo()
-
-            time.sleep(f1)
 
 def main():
     agentd = Csagentd(pidfile=default_pidfile, 
