@@ -27,5 +27,11 @@ def test():
           
     return file_context
 
+def test1():
+    while(1):
+     print "111"
+     time.sleep(0)
+
 if __name__ == "__main__":
-    print test()
+    #print test()
+    test1()

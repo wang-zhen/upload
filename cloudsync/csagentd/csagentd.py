@@ -82,7 +82,7 @@ class Csagentd(Daemon):
         status,message = commands.getstatusoutput(cmd)
         if not status:
             self.logger.debug("%s has been mounted",self.gluster_mountpoint)
-            return status
+            return 0
 
         cmd = "mount.glusterfs  127.0.0.1:/%s %s" % (self.name, self.gluster_mountpoint)
         self.logger.info(cmd)
@@ -99,7 +99,7 @@ class Csagentd(Daemon):
         status,message = commands.getstatusoutput(cmd)
         if not status:
             self.logger.debug("%s has been mounted",self.nas_mountpoint)
-            return status
+            return 0
 
         if self.nastype == 'cifs':
             if self.nasuser and self.naspasswd:
@@ -195,15 +195,17 @@ class Csagentd(Daemon):
         self.logger.info("volume(%s) pid(%s) is running...",self.name,os.getpid())
         self.logger.debug(self.volinfo)
 
-        f1 = 1
+        f1 = 0
         f2 = default_frequency
         f3 = default_frequency
 
         while True:
-            time.sleep(f1)
-            self.update_volinfo()
+            if (f1):
+                time.sleep(f1)
+                self.update_volinfo()
 
             if (not self.volinfo):
+                f1 = default_frequency
                 self.logger.warning("volume %s infos in %s is null!",self.name)
                 continue
 
