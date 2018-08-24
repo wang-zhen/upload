@@ -74,7 +74,7 @@ class Csagentd(Daemon):
 
         return False
 
-    def ms_upload_filesount_gluster_vol(self):
+    def mount_gluster_vol(self):
         cmd = "mount |grep %s" % self.gluster_mountpoint
         status,message = commands.getstatusoutput(cmd)
         if not status:
