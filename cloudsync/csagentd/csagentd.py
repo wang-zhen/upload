@@ -101,7 +101,7 @@ class Csagentd(Daemon):
             self.logger.debug("%s has been mounted",self.nas_mountpoint)
             return 0
 
-        if self.nastype == 'cifs':
+        if self.protocol == 'cifs':
             if self.nasuser and self.naspasswd:
                 cmd = "mount -t cifs -o username='%s',password='%s' //%s/%s %s" % \
                       (self.nasuser, self.naspasswd, self.nashostname, \
@@ -110,7 +110,7 @@ class Csagentd(Daemon):
                 cmd = "mount -t cifs //%s/%s %s" % \
                       (self.nashostname, self.nasshare, self.nas_mountpoint)
 
-        if self.nastype == 'nfs':
+        if self.protocol == 'nfs':
             cmd = "mount  %s:/%s %s" % \
                   (self.nashostname, self.nasshare, self.nas_mountpoint)
 
@@ -238,10 +238,11 @@ class Csagentd(Daemon):
                 continue
             
             if self.volinfo['cs-storetype'] == 'cloudsyncnas':
-                self.logger.debug("cs-storetype : cloudsyncnas, nastype : cifs")
                 self.nasshare = self.volinfo['nasplugin-share'].strip('/')
                 self.nashostname = self.volinfo['nasplugin-hostname'].strip('/')
-                self.nastype = 'cifs' 
+                self.protocol = self.volinfo['nasplugin-protocol']
+
+                self.logger.debug("cs-storetype : cloudsyncnas, protocol : %s",self.protocol)
 
                 self.nasuser = ''
                 self.naspasswd = ''
